@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lockdown Log</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#12161a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lockdown">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #12161a;
+    --bg-raised: #191f24;
+    --bg-sunken: #0d1013;
+    --line: #2a3239;
+    --ink: #e9e6db;
+    --ink-dim: #8b9299;
+    --gold: #c99a4a;
+    --sage: #7fa07a;
+    --rust: #a05d4f;
+    --radius: 3px;
+    --radius-card: 18px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{ margin:0; padding:0; background: var(--bg); }
+  body{
+    font-family: 'Space Grotesk', sans-serif;
+    color: var(--ink);
+    min-height: 100vh;
+    padding: calc(20px + var(--safe-top)) 14px calc(40px + var(--safe-bottom));
+  }
+  .wrap{ max-width: 480px; margin: 0 auto; }
+
+  /* header */
+  .app-header{
+    display:flex;
+    align-items:center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .app-icon{
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    flex-shrink: 0;
+    display:block;
+  }
+  .app-header .titles{ flex:1; min-width:0; }
+  .app-header .label{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+  }
+  .app-header h1{
+    font-size: 19px;
+    font-weight: 600;
+    margin: 1px 0 0;
+    letter-spacing: -0.01em;
+  }
+
+  /* card shell used for every section */
+  .card{
+    background: var(--bg-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+
+  .progress-card .top-row{
+    display:flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .progress-card .day-count{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 26px;
+    font-weight: 500;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .progress-card .day-count small{
+    display:block;
+    font-size: 10px;
+    color: var(--ink-dim);
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    margin-top: 5px;
+  }
+  .progress-card .range{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    text-align: right;
+  }
+  .progress-card .range b{ color: var(--ink); font-weight: 500; display:block; }
+
+  .lockdown-bar{
+    height: 5px;
+    background: var(--bg-sunken);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 12px;
+  }
+  .lockdown-bar-fill{
+    height: 100%;
+    background: var(--gold);
+    border-radius: 3px;
+    transition: width .2s;
+  }
+
+  .card-title{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--ink-dim);
+    margin: 0 0 12px;
+    display:flex;
+    justify-content: space-between;
+  }
+
+  .habit{
+    display:flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 4px;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 12px;
+    transition: background .15s;
+  }
+  .habit:active{ background: var(--bg-sunken); }
+  .habit + .habit{ margin-top: 2px; }
+
+  .check{
+    width: 30px;
+    height: 30px;
+    border: 2px solid var(--line);
+    border-radius: 50%;
+    flex-shrink: 0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition: border-color .15s, background .15s, transform .15s;
+  }
+  .check svg{ opacity:0; width:15px; height:15px; transition: opacity .15s; }
+  .check svg.dash{ width:13px; height:13px; }
+  .habit.done .check{ background: var(--sage); border-color: var(--sage); transform: scale(1.05); }
+  .habit.done .check svg.tick{ opacity:1; }
+  .habit.excused .check{ background: transparent; border-color: var(--gold); border-style: dashed; }
+  .habit.excused .check svg.dash{ opacity:1; }
+
+  .habit-body{ flex: 1; min-width:0; }
+  .habit-name{ font-size: 15px; font-weight: 500; }
+  .habit-target{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    margin-top: 2px;
+  }
+  .habit.done .habit-name{ color: var(--ink); }
+  .habit.excused .habit-name{ color: var(--ink-dim); }
+  .habit.excused .habit-target::after{ content: ' \2014 excused'; color: var(--gold); }
+
+  .streak{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-dim);
+    text-align: right;
+    white-space: nowrap;
+    line-height: 1.5;
+    flex-shrink: 0;
+  }
+  .streak b{ color: var(--gold); font-weight: 600; }
+  .habit.done .streak b{ color: var(--sage); }
+  .streak .best{ display:block; font-size: 10px; color: var(--ink-dim); }
+
+  .divider{ height:1px; background: var(--line); margin: 6px 0; }
+
+  .steps-row{
+    display:flex;
+    align-items:center;
+    gap: 14px;
+  }
+  .steps-row .habit-body{ flex:1; }
+  .steps-input-wrap{
+    display:flex;
+    align-items:baseline;
+    gap: 6px;
+    font-family:'JetBrains Mono', monospace;
+  }
+  .steps-input-wrap input{
+    width: 84px;
+    background: var(--bg-sunken);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    text-align: right;
+  }
+  .steps-input-wrap input:focus{ outline: none; border-color: var(--gold); }
+  .steps-target{ font-size: 12px; color: var(--ink-dim); }
+  .steps-avg{ font-size: 11px; color: var(--ink-dim); margin-top: 4px; }
+  .steps-bar{
+    height: 5px;
+    background: var(--bg-sunken);
+    margin-top: 10px;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .steps-bar-fill{
+    height: 100%;
+    background: var(--gold);
+    border-radius: 3px;
+    transition: width .2s;
+  }
+
+  /* history strip */
+  .ledger-scroll{
+    display:flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 2px 6px;
+    margin: 0 -2px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .ledger-scroll::-webkit-scrollbar{ display:none; }
+  .day-card{
+    flex-shrink: 0;
+    width: 46px;
+    background: var(--bg-sunken);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px 0 10px;
+    display:flex;
+    flex-direction: column;
+    align-items:center;
+    gap: 7px;
+    scroll-snap-align: end;
+  }
+  .day-card.today{ border-color: var(--gold); }
+  .day-label{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+    line-height: 1.3;
+    text-align: center;
+  }
+  .day-card.today .day-label{ color: var(--gold); }
+  .day-dots{ display:flex; flex-direction: column; gap: 5px; align-items:center; }
+
+  .dot{
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--line);
+  }
+  .dot.on{ background: var(--sage); }
+  .dot.partial{ background: var(--gold); }
+  .dot.excused{ background: transparent; border: 1.5px dashed var(--gold); width:6px; height:6px; }
+  .mini-dot{ cursor: pointer; }
+  .mini-dot:active{ transform: scale(1.3); }
+
+  .footnote{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    line-height: 1.6;
+    padding: 2px 4px;
+  }
+
+  .bar-chart{
+    display:flex;
+    align-items:flex-end;
+    gap: 7px;
+    height: 130px;
+    overflow-x: auto;
+    padding: 6px 2px 0;
+    margin: 0 -2px;
+    scrollbar-width: none;
+  }
+  .bar-chart::-webkit-scrollbar{ display:none; }
+  .bar-col{
+    display:flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0;
+    width: 24px;
+    height: 100%;
+  }
+  .bar-track{
+    width: 16px;
+    flex: 1;
+    display:flex;
+    align-items: flex-end;
+  }
+  .bar-fill{
+    width: 100%;
+    min-height: 3px;
+    border-radius: 4px 4px 2px 2px;
+    background: var(--line);
+    transition: height .25s;
+  }
+  .bar-fill.clow{ background: #4d5f4a; }
+  .bar-fill.cmid{ background: #5d7458; }
+  .bar-fill.chigh{ background: var(--sage); }
+  .bar-fill.cfull{ background: var(--gold); }
+  .bar-label{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--ink-dim);
+    margin-top: 7px;
+    text-align: center;
+    line-height: 1.3;
+  }
+  .bar-col.today .bar-label{ color: var(--gold); }
+
+  .reset{
+    margin-top: 14px;
+    width: 100%;
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 12px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  .reset:active{ border-color: var(--rust); color: var(--rust); }
+
+  /* celebration overlay */
+  .celebrate{
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10,12,14,0);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .25s, background .25s;
+    z-index: 50;
+  }
+  .celebrate.show{
+    background: rgba(10,12,14,0.72);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .celebrate-card{
+    background: var(--bg-raised);
+    border: 1px solid var(--gold);
+    border-radius: 22px;
+    padding: 32px 28px;
+    text-align: center;
+    max-width: 280px;
+    transform: scale(.85) translateY(10px);
+    opacity: 0;
+    transition: transform .35s cubic-bezier(.2,1.4,.4,1), opacity .3s;
+    position: relative;
+    overflow: visible;
+  }
+  .celebrate.show .celebrate-card{
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  .celebrate-badge{
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--sage);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin: 0 auto 16px;
+  }
+  .celebrate-badge svg{ width: 30px; height: 30px; }
+  .celebrate-title{
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .celebrate-sub{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-dim);
+    line-height: 1.5;
+  }
+  .confetti{
+    position: absolute;
+    top: -10px;
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
+    opacity: 0;
+  }
+  .celebrate.show .confetti{
+    animation: confetti-fall 1.1s ease-in forwards;
+  }
+  @keyframes confetti-fall{
+    0%   { opacity: 1; transform: translateY(0) rotate(0deg); }
+    100% { opacity: 0; transform: translateY(140px) rotate(200deg); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="app-header">
+    <img src="icon-192.png" class="app-icon" alt="">
+    <div class="titles">
+      <div class="label">LOCKDOWN LOG</div>
+      <h1 id="todayDate">—</h1>
+    </div>
+  </div>
+
+  <div class="card progress-card">
+    <div class="top-row">
+      <div class="day-count">
+        <span id="dayNumber">D0</span>
+        <small id="startedLabel">not started</small>
+      </div>
+      <div class="range">
+        <b id="lockdownRange">—</b>
+        <span id="lockdownRemaining">—</span>
+      </div>
+    </div>
+    <div class="lockdown-bar"><div class="lockdown-bar-fill" id="lockdownBarFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="card">
+    <div id="habits"></div>
+    <div class="divider"></div>
+    <div class="steps-row">
+      <div class="habit-body">
+        <div class="habit-name">Steps</div>
+        <div class="steps-target"><span id="stepsPct">0</span>% of 10,000</div>
+        <div class="steps-bar"><div class="steps-bar-fill" id="stepsBarFill" style="width:0%"></div></div>
+        <div class="steps-avg" id="stepsAvg"></div>
+      </div>
+      <div class="steps-input-wrap">
+        <input type="number" id="stepsInput" min="0" step="100" placeholder="0">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>LAST 14 DAYS</span>
+      <span id="weekSummary">0/0</span>
+    </div>
+    <div class="ledger-scroll" id="ledger"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>DAILY COMPLETION</span>
+      <span id="completionRange">—</span>
+    </div>
+    <div class="bar-chart" id="completionChart"></div>
+  </div>
+
+  <div class="footnote">
+    Tap a habit once for done, again for excused (sick, travel, genuinely out of your hands), again to clear it. Excused days don't break your streak or count against you — they're a pass, not a win. Tap a dot in the strip above to fix a past day.
+  </div>
+
+  <button class="reset" id="resetBtn">Clear all data</button>
+</div>
+
+<div class="celebrate" id="celebrate">
+  <div class="celebrate-card" id="celebrateCard">
+    <div class="celebrate-badge">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 12.5L9.5 18 20 6" stroke="#12161a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="celebrate-title">Full lockdown day</div>
+    <div class="celebrate-sub">Every goal, done. That's the whole point — not one big day, a day you can repeat.</div>
+  </div>
+</div>
+
+<script>
+const HABITS = [
+  { key: 'typing',     name: 'Soni Typing',   target: '40 min' },
+  { key: 'solidworks',  name: 'SolidWorks',    target: '1 hr — YouTube + practice' },
+  { key: 'quran',       name: 'Qur\u2019an',   target: '2 hr — best effort' },
+  { key: 'workout',     name: 'Bodyweight Workout', target: '20-30 min' },
+];
+const MAX_COUNT = HABITS.length + 1; // +1 for steps
+const STEPS_TARGET = 10000;
+const START_DATE = '2026-09-06';
+const END_DATE = '2026-10-01';
+const STORAGE_KEY = 'lockdown:days';
+
+function todayStr(d = new Date()){
+  return d.toISOString().slice(0,10);
+}
+function dateLabel(d){
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+function daysAgo(n){
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d;
+}
+
+let allDays = {};
+const startDate = START_DATE;
+const today = todayStr();
+
+function load(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    allDays = raw ? JSON.parse(raw) : {};
+  } catch(e){ allDays = {}; }
+  render();
+}
+
+function saveDays(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(allDays)); }
+  catch(e){ console.error('save failed', e); }
+}
+
+function getEntry(dateStr){
+  return allDays[dateStr] || { typing:false, solidworks:false, quran:false, steps:0 };
+}
+
+function currentStreak(key){
+  let streak = 0;
+  let cursor = new Date();
+  while(true){
+    const ds = todayStr(cursor);
+    const entry = allDays[ds];
+    const status = entry ? entry[key] : undefined;
+    if(status === true){
+      streak++;
+      cursor.setDate(cursor.getDate()-1);
+    } else if(status === 'excused'){
+      cursor.setDate(cursor.getDate()-1);
+    } else if(ds === today){
+      cursor.setDate(cursor.getDate()-1);
+      continue;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+function bestStreak(key){
+  const allDates = Object.keys(allDays);
+  if(allDates.length === 0) return 0;
+  const minDate = allDates.reduce((a,b) => a < b ? a : b);
+  let run = 0, best = 0;
+  let cursor = new Date(minDate);
+  const end = new Date(today);
+  while(cursor <= end){
+    const ds = todayStr(cursor);
+    const status = allDays[ds] ? allDays[ds][key] : undefined;
+    if(status === true){
+      run++;
+      if(run > best) best = run;
+    } else if(status === 'excused'){
+      // pass
+    } else {
+      run = 0;
+    }
+    cursor.setDate(cursor.getDate()+1);
+  }
+  return best;
+}
+
+function dayCompletedCount(ds){
+  const e = allDays[ds];
+  if(!e) return 0;
+  let count = HABITS.filter(h => e[h.key] === true).length;
+  if((e.steps || 0) >= STEPS_TARGET) count++;
+  return count;
+}
+
+function isDayComplete(entry){
+  const habitsOk = HABITS.every(h => entry[h.key] === true || entry[h.key] === 'excused');
+  const stepsOk = (entry.steps || 0) >= STEPS_TARGET;
+  return habitsOk && stepsOk;
+}
+
+function celebrate(){
+  const overlay = document.getElementById('celebrate');
+  const card = document.getElementById('celebrateCard');
+  card.querySelectorAll('.confetti').forEach(c => c.remove());
+  const colors = ['#c99a4a', '#7fa07a', '#e9e6db'];
+  for(let i = 0; i < 16; i++){
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = (10 + Math.random() * 80) + '%';
+    c.style.background = colors[i % colors.length];
+    c.style.animationDelay = (Math.random() * 0.25) + 's';
+    card.appendChild(c);
+  }
+  overlay.classList.add('show');
+  const dismiss = () => overlay.classList.remove('show');
+  overlay.onclick = dismiss;
+  setTimeout(dismiss, 2600);
+}
+
+function checkCelebration(dateStr){
+  if(dateStr !== today) return;
+  const entry = getEntry(dateStr);
+  if(isDayComplete(entry) && !entry.celebrated){
+    entry.celebrated = true;
+    allDays[dateStr] = entry;
+    saveDays();
+    celebrate();
+  }
+}
+function cycleHabit(key, dateStr = today){
+  const entry = getEntry(dateStr);
+  const current = entry[key];
+  if(current !== true && current !== 'excused'){ entry[key] = true; }
+  else if(current === true){ entry[key] = 'excused'; }
+  else { entry[key] = false; }
+  allDays[dateStr] = entry;
+  saveDays();
+  render();
+  checkCelebration(dateStr);
+}
+
+function updateSteps(val){
+  const entry = getEntry(today);
+  entry.steps = Math.max(0, parseInt(val || '0', 10));
+  allDays[today] = entry;
+  saveDays();
+  renderStepsOnly();
+  checkCelebration(today);
+}
+
+function renderStepsOnly(){
+  const entry = getEntry(today);
+  const pct = Math.min(100, Math.round((entry.steps / STEPS_TARGET) * 100));
+  document.getElementById('stepsPct').textContent = pct;
+  document.getElementById('stepsBarFill').style.width = pct + '%';
+
+  let sum = 0, count = 0;
+  for(let i = 0; i < 7; i++){
+    const ds = todayStr(daysAgo(i));
+    if(allDays[ds]){ sum += (allDays[ds].steps || 0); count++; }
+  }
+  const avg = count ? Math.round(sum / count) : 0;
+  document.getElementById('stepsAvg').textContent = count ? `avg ${avg.toLocaleString()} / day over last ${count}d` : '';
+}
+
+function render(){
+  document.getElementById('todayDate').textContent = dateLabel(new Date());
+
+  const dayNum = Math.floor((new Date(today) - new Date(startDate)) / 86400000) + 1;
+  const totalDays = Math.floor((new Date(END_DATE) - new Date(startDate)) / 86400000) + 1;
+  const remaining = Math.max(0, Math.floor((new Date(END_DATE) - new Date(today)) / 86400000));
+  if(dayNum < 1){
+    const untilStart = Math.ceil((new Date(startDate) - new Date(today)) / 86400000);
+    document.getElementById('dayNumber').textContent = 'D0 / ' + totalDays;
+    document.getElementById('startedLabel').textContent = 'starts in ' + untilStart + 'd';
+  } else {
+    document.getElementById('dayNumber').textContent = 'D' + Math.min(dayNum, totalDays) + ' / ' + totalDays;
+    document.getElementById('startedLabel').textContent = 'since ' + new Date(startDate).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  }
+  document.getElementById('lockdownRange').textContent = new Date(startDate).toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' \u2192 ' + new Date(END_DATE).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  document.getElementById('lockdownRemaining').textContent = remaining === 0 ? 'last day' : remaining + ' days left';
+  const pctThrough = Math.min(100, Math.max(0, Math.round((Math.max(1,dayNum) / totalDays) * 100)));
+  document.getElementById('lockdownBarFill').style.width = pctThrough + '%';
+
+  const entry = getEntry(today);
+  const habitsEl = document.getElementById('habits');
+  habitsEl.innerHTML = '';
+  HABITS.forEach(h => {
+    const state = entry[h.key];
+    const done = state === true;
+    const excused = state === 'excused';
+    const streak = currentStreak(h.key);
+    const best = bestStreak(h.key);
+    const row = document.createElement('div');
+    row.className = 'habit' + (done ? ' done' : '') + (excused ? ' excused' : '');
+    row.innerHTML = `
+      <div class="check">
+        <svg class="tick" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.2 12 13 4" stroke="#12161a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg class="dash" viewBox="0 0 16 16" fill="none"><path d="M4 8H12" stroke="#c99a4a" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <div class="habit-body">
+        <div class="habit-name">${h.name}</div>
+        <div class="habit-target">${h.target}</div>
+      </div>
+      <div class="streak">${streak > 0 ? `<b>${streak}</b> day streak` : 'no streak yet'}<span class="best">best: ${best}</span></div>
+    `;
+    row.addEventListener('click', () => cycleHabit(h.key));
+    habitsEl.appendChild(row);
+  });
+
+  const stepsInput = document.getElementById('stepsInput');
+  stepsInput.value = entry.steps || '';
+  renderStepsOnly();
+
+  const ledger = document.getElementById('ledger');
+  ledger.innerHTML = '';
+  let completeDays = 0, ledgerDays = 0;
+  for(let i = 13; i >= 0; i--){
+    const d = daysAgo(i);
+    const ds = todayStr(d);
+    const e = allDays[ds];
+    const isToday = ds === today;
+    ledgerDays++;
+
+    const card = document.createElement('div');
+    card.className = 'day-card' + (isToday ? ' today' : '');
+
+    const label = document.createElement('div');
+    label.className = 'day-label';
+    label.textContent = d.toLocaleDateString(undefined,{weekday:'short'}).slice(0,2) + ' ' + d.getDate();
+    card.appendChild(label);
+
+    const dots = document.createElement('div');
+    dots.className = 'day-dots';
+
+    HABITS.map(h => h.key).forEach(k => {
+      const status = e ? e[k] : undefined;
+      const dot = document.createElement('div');
+      dot.className = 'dot mini-dot' + (status === true ? ' on' : status === 'excused' ? ' excused' : '');
+      dot.title = 'Tap to cycle ' + k + ' for ' + ds;
+      dot.addEventListener('click', () => cycleHabit(k, ds));
+      dots.appendChild(dot);
+    });
+
+    const stepsVal = e ? (e.steps || 0) : 0;
+    const stepsDot = document.createElement('div');
+    stepsDot.className = 'dot' + (stepsVal >= STEPS_TARGET ? ' on' : (stepsVal > 0 ? ' partial' : ''));
+    dots.appendChild(stepsDot);
+
+    card.appendChild(dots);
+    ledger.appendChild(card);
+
+    if(e){
+      const doneCount = HABITS.filter(h => e[h.key] === true).length + (stepsVal >= STEPS_TARGET ? 1 : 0);
+      if(doneCount === MAX_COUNT) completeDays++;
+    }
+  }
+  document.getElementById('weekSummary').textContent = completeDays + '/' + ledgerDays + ' full days';
+
+  // daily completion bar chart (last 14 days)
+  document.getElementById('completionRange').textContent = 'last 14 days';
+  const chartEl = document.getElementById('completionChart');
+  chartEl.innerHTML = '';
+  for(let i = 13; i >= 0; i--){
+    const d = daysAgo(i);
+    const ds = todayStr(d);
+    const isToday = ds === today;
+    const count = dayCompletedCount(ds);
+    const ratio = count / MAX_COUNT;
+    const pct = Math.max(3, Math.round(ratio * 100));
+    const tier = count === 0 ? '' : ratio === 1 ? 'cfull' : ratio >= 0.6 ? 'chigh' : 'cmid';
+    const col = document.createElement('div');
+    col.className = 'bar-col' + (isToday ? ' today' : '');
+    col.innerHTML = `
+      <div class="bar-track"><div class="bar-fill ${tier}" style="height:${count > 0 ? pct : 3}%"></div></div>
+      <div class="bar-label">${d.toLocaleDateString(undefined,{weekday:'short'}).slice(0,2)}<br>${d.getDate()}</div>
+    `;
+    chartEl.appendChild(col);
+  }
+  requestAnimationFrame(() => { chartEl.scrollLeft = chartEl.scrollWidth; });
+
+  // keep the strip scrolled to today on first paint
+  requestAnimationFrame(() => { ledger.scrollLeft = ledger.scrollWidth; });
+}
+
+document.getElementById('stepsInput').addEventListener('input', (e) => updateSteps(e.target.value));
+
+document.getElementById('resetBtn').addEventListener('click', async () => {
+  if(!confirm('Clear all logged days? This cannot be undone.')) return;
+  allDays = {};
+  await saveDays();
+  render();
+});
+
+load();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
